@@ -1,0 +1,18 @@
+[package]
+name = "rust-toy-ca"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+warp = "0.3"
+openssl-sys = "0.9"
+openssl = "0.10"
+serde = "1.0.147"
+serde_derive = "1.0.147"
+base64 = "0.13.1"
+rand = "0.8.5"
+clap = { version = "4.0.26", features = ["derive"] }
+proc-macro2 = "1.0.47"  # to resolve conflict when adding clap
