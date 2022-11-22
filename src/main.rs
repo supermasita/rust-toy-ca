@@ -11,7 +11,6 @@ use serde_derive::{Deserialize, Serialize};
 use std::fs;
 use clap::Parser;
 
-/// Simple program to greet a person
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -32,22 +31,21 @@ struct SignReq {
 
 #[derive(Deserialize, Serialize)]
 struct SignRep {
-    ca_cert_base64: String,
     signed_cert_base64: String,
 }
 
 #[derive(Deserialize, Serialize)]
-struct CaRep {
+struct CaCertRep {
     ca_cert_base64: String,
 }
 
-fn _load_ca_cert() -> String {
-    let file_contents: String = fs::read_to_string("test_helpers/ca.crt").expect("Couldn´t read the file");
+fn _load_ca_cert(path: &String) -> String {
+    let file_contents: String = fs::read_to_string(path).expect("Couldn´t read the file");
     file_contents
 }
 
-fn _load_ca_pk() -> String {
-    let file_contents: String = fs::read_to_string("test_helpers/ca.key").expect("Couldn´t read the file");
+fn _load_ca_pk(path: &String) -> String {
+    let file_contents: String = fs::read_to_string(path).expect("Couldn´t read the file");
     file_contents
 }
 
@@ -86,7 +84,6 @@ fn _sign_csr_cert(csr_base64: &String, ca_cert: &X509, ca_pkey: &PKey<Private>) 
         cert_builder.sign(&ca_pkey, MessageDigest::from_ptr(std::ptr::null()));
     };
     let cert_final = cert_builder.build();
-    println!("CERT FINAL {:#?}", cert_final);
     return _encode_it(&cert_final.to_pem().unwrap());
 }
 
@@ -96,30 +93,39 @@ async fn _create_from_csr(
     ca_pkey: PKey<Private>,
 ) -> Result<impl warp::Reply, warp::Rejection> {
     let cert_rep = SignRep {
-        ca_cert_base64: base64::encode(_load_ca_cert()),
         signed_cert_base64: _sign_csr_cert(&item.csr_base64, &ca_cert, &ca_pkey),
     };
     Ok(warp::reply::json(&cert_rep))
+}
+
+async fn _get_ca_cert(
+    ca_cert: X509,
+) -> Result<impl warp::Reply, warp::Rejection> {
+    let ca_cert_rep = CaCertRep {
+        ca_cert_base64: _encode_it(&ca_cert.to_pem().unwrap()),
+    };
+    Ok(warp::reply::json(&ca_cert_rep))
 }
 
 #[tokio::main]
 async fn main() {
 
     let args = Args::parse();
-    println!("{:?}", args);
-
-    let ca_cert = X509::from_pem(_load_ca_cert().as_bytes()).unwrap();
+    let ca_cert = X509::from_pem(_load_ca_cert(&args.ca_cert_file).as_bytes()).unwrap();
     let ca_cert_w = warp::any().map(move || ca_cert.clone());
-    let ca_pkey = PKey::private_key_from_pem(_load_ca_pk().as_bytes()).unwrap();
+    let ca_pkey = PKey::private_key_from_pem(_load_ca_pk(&args.ca_pkey_file).as_bytes()).unwrap();
     let ca_pkey_w = warp::any().map(move || ca_pkey.clone());
 
-    // todo: response needs to be json
-    let route_get_ca_cert = warp::path!("get-ca-cert").map(|| base64::encode(_load_ca_cert()));
+    let route_get_ca_cert = warp::get()
+        .and(warp::path("get-ca-cert"))
+        .and(warp::path::end())
+        .and(ca_cert_w.clone())
+        .and_then(_get_ca_cert);
+
 
     let route_create_from_csr = warp::post()
         .and(warp::path("create-from-csr"))
         .and(warp::path::end())
-        .and(warp::post())
         .and(warp::body::json())
         .and(ca_cert_w.clone())
         .and(ca_pkey_w.clone())
