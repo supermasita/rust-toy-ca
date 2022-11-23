@@ -4,9 +4,13 @@
 ## Limitations
 - Serial is always `1`
 - Only ED25519/EdDSA
-- No V3 extensions
+- No V3 extensions (aside from `subject_key_identifier1`)
 - Input/Output of certs/csr in base64
 - no tls
+- no auth
+- no tests
+- naive/optimistic design
+- cert duration fixed to 1 year
 
 
 ## Cool reading

@@ -11,6 +11,12 @@ use serde_derive::{Deserialize, Serialize};
 use std::fs;
 use clap::Parser;
 
+#[derive(Debug, Deserialize, Serialize)]
+enum Status{
+    SUCCESS,
+    FAILURE,
+}
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -23,7 +29,6 @@ struct Args {
    ca_pkey_file: String,
 }
 
-
 #[derive(Deserialize, Serialize)]
 struct SignReq {
     csr_base64: String,
@@ -32,6 +37,7 @@ struct SignReq {
 #[derive(Deserialize, Serialize)]
 struct SignRep {
     signed_cert_base64: String,
+    status: Status
 }
 
 #[derive(Deserialize, Serialize)]
@@ -40,12 +46,12 @@ struct CaCertRep {
 }
 
 fn _load_ca_cert(path: &String) -> String {
-    let file_contents: String = fs::read_to_string(path).expect("Couldn´t read the file");
+    let file_contents: String = fs::read_to_string(path).expect("Couldn´t read the CA certificate file");
     file_contents
 }
 
 fn _load_ca_pk(path: &String) -> String {
-    let file_contents: String = fs::read_to_string(path).expect("Couldn´t read the file");
+    let file_contents: String = fs::read_to_string(path).expect("Couldn´t read the CA private key file");
     file_contents
 }
 
@@ -54,8 +60,8 @@ fn _encode_it(data: &[u8]) -> String {
 }
 
 fn _sign_csr_cert(csr_base64: &String, ca_cert: &X509, ca_pkey: &PKey<Private>) -> String {
-    let csr_as_vec = decode(csr_base64).unwrap();
-    let csr = X509Req::from_pem(&csr_as_vec).unwrap();
+    let csr_as_vec = decode(csr_base64).unwrap();  // what if broken base64?
+    let csr = X509Req::from_pem(&csr_as_vec).unwrap();  // what if broken cert?
     println!("CSR CN {:#?}", &csr.subject_name());
 
     let one_year = Asn1Time::days_from_now(365).unwrap();
@@ -94,6 +100,7 @@ async fn _create_from_csr(
 ) -> Result<impl warp::Reply, warp::Rejection> {
     let cert_rep = SignRep {
         signed_cert_base64: _sign_csr_cert(&item.csr_base64, &ca_cert, &ca_pkey),
+        status: Status::SUCCESS
     };
     Ok(warp::reply::json(&cert_rep))
 }
@@ -117,6 +124,8 @@ async fn main() {
     let ca_pkey_w = warp::any().map(move || ca_pkey.clone());
 
     let route_get_ca_cert = warp::get()
+        .and(warp::path("api"))
+        .and(warp::path("v1"))
         .and(warp::path("get-ca-cert"))
         .and(warp::path::end())
         .and(ca_cert_w.clone())
@@ -124,6 +133,8 @@ async fn main() {
 
 
     let route_create_from_csr = warp::post()
+        .and(warp::path("api"))
+        .and(warp::path("v1"))
         .and(warp::path("create-from-csr"))
         .and(warp::path::end())
         .and(warp::body::json())
