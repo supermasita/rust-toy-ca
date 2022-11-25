@@ -1,5 +1,4 @@
 use warp::Filter;
-
 use base64::decode;
 use openssl::asn1::{Asn1Integer, Asn1Time};
 use openssl::bn::BigNum;
@@ -10,6 +9,7 @@ use openssl::x509::{X509Builder, X509Req, X509};
 use serde_derive::{Deserialize, Serialize};
 use std::fs;
 use clap::Parser;
+
 
 #[derive(Debug, Deserialize, Serialize)]
 enum Status{
@@ -43,6 +43,7 @@ struct SignRep {
 #[derive(Deserialize, Serialize)]
 struct CaCertRep {
     ca_cert_base64: String,
+    status: Status
 }
 
 fn _load_ca_cert(path: &String) -> String {
@@ -59,8 +60,12 @@ fn _encode_it(data: &[u8]) -> String {
     return base64::encode(data);
 }
 
-fn _sign_csr_cert(csr_base64: &String, ca_cert: &X509, ca_pkey: &PKey<Private>) -> String {
-    let csr_as_vec = decode(csr_base64).unwrap();  // what if broken base64?
+fn _sign_csr_cert(csr_base64: &String, ca_cert: &X509, ca_pkey: &PKey<Private>) -> (String, Status) {
+    let csr_as_vec = match decode(csr_base64){
+        Ok(c) =>  c,
+        Err(e) => return ("...".to_string(), Status::FAILURE) // panic!("Could not decode: {:?}", e)
+    }; 
+
     let csr = X509Req::from_pem(&csr_as_vec).unwrap();  // what if broken cert?
     println!("CSR CN {:#?}", &csr.subject_name());
 
@@ -90,7 +95,7 @@ fn _sign_csr_cert(csr_base64: &String, ca_cert: &X509, ca_pkey: &PKey<Private>) 
         cert_builder.sign(&ca_pkey, MessageDigest::from_ptr(std::ptr::null()));
     };
     let cert_final = cert_builder.build();
-    return _encode_it(&cert_final.to_pem().unwrap());
+    return (_encode_it(&cert_final.to_pem().unwrap()), Status::SUCCESS);
 }
 
 async fn _create_from_csr(
@@ -98,9 +103,10 @@ async fn _create_from_csr(
     ca_cert: X509,
     ca_pkey: PKey<Private>,
 ) -> Result<impl warp::Reply, warp::Rejection> {
+    let cert_tuple = _sign_csr_cert(&item.csr_base64, &ca_cert, &ca_pkey);
     let cert_rep = SignRep {
-        signed_cert_base64: _sign_csr_cert(&item.csr_base64, &ca_cert, &ca_pkey),
-        status: Status::SUCCESS
+        signed_cert_base64: cert_tuple.0,
+        status: cert_tuple.1,
     };
     Ok(warp::reply::json(&cert_rep))
 }
@@ -110,6 +116,7 @@ async fn _get_ca_cert(
 ) -> Result<impl warp::Reply, warp::Rejection> {
     let ca_cert_rep = CaCertRep {
         ca_cert_base64: _encode_it(&ca_cert.to_pem().unwrap()),
+        status: Status::SUCCESS
     };
     Ok(warp::reply::json(&ca_cert_rep))
 }
