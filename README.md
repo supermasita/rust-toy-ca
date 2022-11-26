@@ -1,18 +1,18 @@
 # rust-toy-ca
-This is a simple service made using [Warp]() and OpenSSL: it will take a CSR and return a certificate signed by the CA.
+This is a simple service made using [Warp]() and OpenSSL: it will take a CSR and return a certificate signed by the Certificate Authority (CA) credentials you provide.
 
 ## DISCLAIMER
 Please note that I do not know enoguh about of Rust or OpenSSL. I made this to try to learn more, so don´t be using this in production... and wherever you use this, please be aware that I take no responsability for the outcome.
 
 ## Limitations / (bad) Design choices
-The following are current known limitations; these might change in the future, but I am making no commitment to do so:
-- Serial is always `1`
+Needless to say that this package will not provide a complete Certificate Authority. The following are current known limitations; these might change in the future, but I am making no commitment to do so:
+- Serial is always `1` (in a real CA, this would be unique per certificate)
 - Only ED25519/EdDSA
 - No V3 extensions (aside from `subject_key_identifier1`)
-- Input/Output of certs/csr in base64
-- No TLS
+- Input/Output of CSR and certificates is base64 encoded (to work around multiline in JSON)
+- No TLS/SSL support for the server
 - No authentication
-- No tests
+- No unit tests
 - Naive design (including multiple unhandled Results)
 - Certificate valid fixed for 1 year (fixed)
 - Very basic logging
