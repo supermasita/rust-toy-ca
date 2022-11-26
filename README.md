@@ -44,7 +44,7 @@ curl http://127.0.0.1:3030/api/v1.0/create-from-csr -H "Content-Type: applicatio
 ```
 
 ## Cool readings
-Thins I've read for inspiration:
+Things I've read for inspiration:
 - https://blog.pinterjann.is/ed25519-certificates.html
 - https://github.com/seanmonstar/warp/tree/master/examples
 - https://blog.logrocket.com/creating-a-rest-api-in-rust-with-warp/
