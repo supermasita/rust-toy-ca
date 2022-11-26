@@ -12,6 +12,7 @@ use clap::Parser;
 use std::fmt;
 use log::{debug, error, info, trace, warn};
 use log4rs;
+mod logging;
 
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -26,42 +27,67 @@ impl fmt::Display for Status {
     }
 }
 
+/// CLI arguments
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-   /// CA pub cert
+   /// CA public certificate path on storage
    #[arg(long)]
    ca_cert_file: String,
 
-   /// CA priv key
+   /// CA private key path on storage
    #[arg(long)]
    ca_pkey_file: String,
 }
 
+/// Signing request
 #[derive(Deserialize, Serialize)]
 struct SignReq {
+    /// Signing request
+    /// Takes a CSR encoded as base64 as input
     csr_base64: String,
 }
 
+/// Signing request reply
 #[derive(Deserialize, Serialize)]
 struct SignRep {
+    /// Signing request reply
+    /// Returns 
+    /// - the signed certificate as a PEM, base64 encoded
+    /// - status
+    /// - status message, which can contain the exception message, if there was one
     signed_cert_base64: String,
     status: Status,
     status_message: String
 }
 
+/// CA certificate reply
 #[derive(Deserialize, Serialize)]
 struct CaCertRep {
+    /// CA certificate reply
+    /// 
+    /// Returns
+    /// - CA public certificate as PEM, base64 encoded
+    /// - status 
+    /// - status message, which can contain the exception message, if there was one
     ca_cert_base64: String,
     status: Status,
     status_message: String
 }
 
+/// Loads the CA public certificate (PEM) from storage
+/// 
+/// # Arguments
+/// * `path`: path for certificate on storage
 fn _load_ca_cert(path: &String) -> String {
     let file_contents: String = fs::read_to_string(path).expect("Couldn´t read the CA certificate file");
     file_contents
 }
 
+/// Loads the CA private key (PKCS8) from storage
+/// 
+/// # Arguments
+/// * `path`: path for private key on storage
 fn _load_ca_pk(path: &String) -> String {
     let file_contents: String = fs::read_to_string(path).expect("Couldn´t read the CA private key file");
     file_contents
@@ -147,14 +173,21 @@ async fn _get_ca_cert(
 
 #[tokio::main]
 async fn main() {
-    log4rs::init_file("config/logging_config.yaml", Default::default()).unwrap();
 
+    // Load logging configuration
+    log4rs::init_config(logging::get_log_config()).unwrap();
+
+    // Load CLI args
     let args = Args::parse();
+
+    // Load certificates and keys
+    // Make a clone for warp
     let ca_cert = X509::from_pem(_load_ca_cert(&args.ca_cert_file).as_bytes()).unwrap();
     let ca_cert_w = warp::any().map(move || ca_cert.clone());
     let ca_pkey = PKey::private_key_from_pem(_load_ca_pk(&args.ca_pkey_file).as_bytes()).unwrap();
     let ca_pkey_w = warp::any().map(move || ca_pkey.clone());
 
+    // Define routes
     let route_get_ca_cert = warp::get()
         .and(warp::path("api"))
         .and(warp::path("v1.0"))
@@ -162,8 +195,6 @@ async fn main() {
         .and(warp::path::end())
         .and(ca_cert_w.clone())
         .and_then(_get_ca_cert);
-
-
     let route_create_from_csr = warp::post()
         .and(warp::path("api"))
         .and(warp::path("v1.0"))
@@ -173,9 +204,9 @@ async fn main() {
         .and(ca_cert_w.clone())
         .and(ca_pkey_w.clone())
         .and_then(_create_from_csr);
+    let routes = warp::any().and(route_get_ca_cert.or(route_create_from_csr)).with(warp::log("stdout"));
 
-    let routes = warp::any().and(route_get_ca_cert.or(route_create_from_csr)).with(warp::log("rust-toy-ca"));
-
+    // Start server
     info!("rust-toy-ca running...");
     warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
 }
