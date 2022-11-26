@@ -13,8 +13,9 @@ use std::fmt;
 use log::{debug, error, info, trace, warn};
 use log4rs;
 mod logging;
+use std::net::SocketAddr;
 
-
+/// Request status (CA cert request, CSR signing)
 #[derive(Debug, Deserialize, Serialize)]
 enum Status{
     SUCCESS,
@@ -38,6 +39,10 @@ struct Args {
    /// CA private key path on storage
    #[arg(long)]
    ca_pkey_file: String,
+
+   /// IP:Port for the server to listen
+   #[arg(long)]
+   listen: String,
 }
 
 /// Signing request
@@ -219,6 +224,9 @@ async fn main() {
 
     // Load CLI args
     let args = Args::parse();
+    
+    // Listen address:port
+    let listen_addr: SocketAddr = args.listen.parse().expect("Could not parse passed IP:Port !!!");
 
     // Load certificates and keys
     // Make a clone for warp
@@ -248,5 +256,5 @@ async fn main() {
 
     // Start server
     info!("rust-toy-ca running...");
-    warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
+    warp::serve(routes).run(listen_addr).await;
 }
