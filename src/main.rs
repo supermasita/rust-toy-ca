@@ -43,35 +43,29 @@ struct Args {
 /// Signing request
 #[derive(Deserialize, Serialize)]
 struct SignReq {
-    /// Signing request
-    /// Takes a CSR encoded as base64 as input
+    /// CSR base64 encoded
     csr_base64: String,
 }
 
 /// Signing request reply
 #[derive(Deserialize, Serialize)]
-struct SignRep {
-    /// Signing request reply
-    /// Returns 
-    /// - the signed certificate as a PEM, base64 encoded
-    /// - status
-    /// - status message, which can contain the exception message, if there was one
+struct SignRep { 
+    /// the signed certificate as a PEM, base64 encoded
     signed_cert_base64: String,
+    /// status
     status: Status,
+    /// status message, which can contain the exception message, if there was one
     status_message: String
 }
 
 /// CA certificate reply
 #[derive(Deserialize, Serialize)]
 struct CaCertRep {
-    /// CA certificate reply
-    /// 
-    /// Returns
-    /// - CA public certificate as PEM, base64 encoded
-    /// - status 
-    /// - status message, which can contain the exception message, if there was one
+    /// CA public certificate as PEM, base64 encoded
     ca_cert_base64: String,
+    /// status
     status: Status,
+    /// status message, which can contain the exception message, if there was one
     status_message: String
 }
 
@@ -79,7 +73,7 @@ struct CaCertRep {
 /// 
 /// # Arguments
 /// * `path`: path for certificate on storage
-fn _load_ca_cert(path: &String) -> String {
+fn load_ca_cert(path: &String) -> String {
     let file_contents: String = fs::read_to_string(path).expect("Couldn´t read the CA certificate file");
     file_contents
 }
@@ -88,16 +82,31 @@ fn _load_ca_cert(path: &String) -> String {
 /// 
 /// # Arguments
 /// * `path`: path for private key on storage
-fn _load_ca_pk(path: &String) -> String {
+fn load_ca_pk(path: &String) -> String {
     let file_contents: String = fs::read_to_string(path).expect("Couldn´t read the CA private key file");
     file_contents
 }
 
-fn _encode_it(data: &[u8]) -> String {
+/// Returns base64 encode (String) from passed data
+/// 
+/// # Arguments
+/// * `data`: 
+fn to_base64(data: &[u8]) -> String {
     return base64::encode(data);
 }
 
-fn _sign_csr_cert(csr_base64: &String, ca_cert: &X509, ca_pkey: &PKey<Private>) -> (String, Status, String) {
+/// Returns a public certificate (PEM) created using the passed CSR
+/// 
+/// # Arguments
+/// * `csr_base64`: base64 representation of CSR
+/// * `ca_cert`
+/// * `ca_pkey`
+/// 
+/// # Returns
+/// * PEM certificate (String)
+/// * Status (Status) 
+/// * Status Message (String)
+fn create_cert_from_csr(csr_base64: &String, ca_cert: &X509, ca_pkey: &PKey<Private>) -> (String, Status, String) {
     // Decode CSR
     let csr_as_vec = match decode(csr_base64){
         Ok(c) =>  c,
@@ -143,15 +152,24 @@ fn _sign_csr_cert(csr_base64: &String, ca_cert: &X509, ca_pkey: &PKey<Private>) 
     // Build certificate
     let cert_final = cert_builder.build();
     
-    return (_encode_it(&cert_final.to_pem().unwrap()), Status::SUCCESS, Status::SUCCESS.to_string());
+    return (to_base64(&cert_final.to_pem().unwrap()), Status::SUCCESS, Status::SUCCESS.to_string());
 }
 
-async fn _create_from_csr(
+/// Function for `create-from-csr` Warp route
+/// 
+/// # Arguments
+/// * `item`
+/// * `ca_cert`
+/// * `ca_pkey`
+/// 
+/// # Returns
+/// * `SignRep`
+async fn create_from_csr(
     item: SignReq,
     ca_cert: X509,
     ca_pkey: PKey<Private>,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    let cert_tuple = _sign_csr_cert(&item.csr_base64, &ca_cert, &ca_pkey);
+    let cert_tuple = create_cert_from_csr(&item.csr_base64, &ca_cert, &ca_pkey);
     let cert_rep = SignRep {
         signed_cert_base64: cert_tuple.0,
         status: cert_tuple.1,
@@ -160,20 +178,42 @@ async fn _create_from_csr(
     Ok(warp::reply::json(&cert_rep))
 }
 
-async fn _get_ca_cert(
+/// Function for `get-ca-cert` Warp route
+/// 
+/// # Arguments
+/// * `ca_cert`
+/// 
+/// # Returns
+/// * `CaCertRep`
+async fn get_ca_cert(
     ca_cert: X509,
 ) -> Result<impl warp::Reply, warp::Rejection> {
     let ca_cert_rep = CaCertRep {
-        ca_cert_base64: _encode_it(&ca_cert.to_pem().unwrap()),
+        ca_cert_base64: to_base64(&ca_cert.to_pem().unwrap()),
         status: Status::SUCCESS,
         status_message: Status::SUCCESS.to_string()
     };
     Ok(warp::reply::json(&ca_cert_rep))
 }
 
+
+/// rust-toy-ca uses `warp` and `openssl` to sign certificates from CSR
+/// 
+/// To run from CLI, you will need to pass the following arguments:
+/// * `--ca-cert-file`: path for PEM certificate
+/// * `--ca-pkey-file`: path for PKCS8 key
+/// 
+/// # Examples
+/// ```
+/// $ cargo run -- --ca-cert-file test_helpers/ca.crt --ca-pkey-file test_helpers/ca.key
+/// ```
+/// 
+/// ```
+/// $ ./rust-toy-ca --ca-cert-file test_helpers/ca.crt --ca-pkey-file test_helpers/ca.key
+/// ```
+/// 
 #[tokio::main]
 async fn main() {
-
     // Load logging configuration
     log4rs::init_config(logging::get_log_config()).unwrap();
 
@@ -182,9 +222,9 @@ async fn main() {
 
     // Load certificates and keys
     // Make a clone for warp
-    let ca_cert = X509::from_pem(_load_ca_cert(&args.ca_cert_file).as_bytes()).unwrap();
+    let ca_cert = X509::from_pem(load_ca_cert(&args.ca_cert_file).as_bytes()).unwrap();
     let ca_cert_w = warp::any().map(move || ca_cert.clone());
-    let ca_pkey = PKey::private_key_from_pem(_load_ca_pk(&args.ca_pkey_file).as_bytes()).unwrap();
+    let ca_pkey = PKey::private_key_from_pem(load_ca_pk(&args.ca_pkey_file).as_bytes()).unwrap();
     let ca_pkey_w = warp::any().map(move || ca_pkey.clone());
 
     // Define routes
@@ -194,7 +234,7 @@ async fn main() {
         .and(warp::path("get-ca-cert"))
         .and(warp::path::end())
         .and(ca_cert_w.clone())
-        .and_then(_get_ca_cert);
+        .and_then(get_ca_cert);
     let route_create_from_csr = warp::post()
         .and(warp::path("api"))
         .and(warp::path("v1.0"))
@@ -203,7 +243,7 @@ async fn main() {
         .and(warp::body::json())
         .and(ca_cert_w.clone())
         .and(ca_pkey_w.clone())
-        .and_then(_create_from_csr);
+        .and_then(create_from_csr);
     let routes = warp::any().and(route_get_ca_cert.or(route_create_from_csr)).with(warp::log("stdout"));
 
     // Start server
