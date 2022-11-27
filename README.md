@@ -26,7 +26,7 @@ $ ./rust-toy-ca --ca-cert-file test_helpers/ca.crt --ca-pkey-file test_helpers/c
 ```
 
 ## Running with Docker
-_Note that you can find the latest Docker image at [Docker Hub](https://hub.docker.com/repository/docker/supermasita/rust-toy-ca)_.
+_Note that you can find the latest Docker image at [Docker Hub](https://hub.docker.com/r/supermasita/rust-toy-ca)_.
 
 Docker command example, assuming the following:
 - your certificate and key (`ca.crt`/`ca.key`) are stored in `/home/user/certs/`
