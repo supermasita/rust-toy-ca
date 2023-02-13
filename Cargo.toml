@@ -16,6 +16,7 @@ serde_derive = "1.0.147"
 base64 = "0.13.1"
 rand = "0.8.5"
 clap = { version = "4.0.26", features = ["derive"] }
+clap_lex = "0.3.0"
 proc-macro2 = "1.0.47"  # to resolve conflict when adding clap
 log = "0.4"
 log4rs = "1"
