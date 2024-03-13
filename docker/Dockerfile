@@ -5,7 +5,7 @@
 
 FROM ubuntu:latest
 
-ENV UPDATED "2022-11-27"
+ENV UPDATED "2024-03-13"
 
 RUN apt-get update \
     && apt-get install -y cargo curl unzip openssl libssl-dev pkg-config
