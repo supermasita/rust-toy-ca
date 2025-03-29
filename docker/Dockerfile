@@ -13,10 +13,10 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust using rustup
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
-    && export PATH="$HOME/.cargo/bin:$PATH" \
-    && source $HOME/.cargo/env \
-    && rustup default stable
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+# Set the PATH environment variable to include Cargo's bin directory
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Set the working directory
 WORKDIR /opt/
@@ -35,4 +35,3 @@ RUN cd rust-toy-ca \
 
 # Expose the port
 EXPOSE 8888
-
