@@ -5,20 +5,34 @@
 
 FROM ubuntu:latest
 
-ENV UPDATED "2024-03-13"
+ENV UPDATED "2025-03-29"
 
+# Install dependencies
 RUN apt-get update \
-    && apt-get install -y cargo curl unzip openssl libssl-dev pkg-config
+    && apt-get install -y curl unzip openssl libssl-dev pkg-config \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN cd /opt/ \
-    && curl https://codeload.github.com/supermasita/rust-toy-ca/zip/main -o main.zip \
+# Install Rust using rustup
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+    && export PATH="$HOME/.cargo/bin:$PATH" \
+    && source $HOME/.cargo/env \
+    && rustup default stable
+
+# Set the working directory
+WORKDIR /opt/
+
+# Download and unzip the rust-toy-ca project
+RUN curl -L https://codeload.github.com/supermasita/rust-toy-ca/zip/main -o main.zip \
     && unzip main.zip \
     && mv rust-toy-ca-main rust-toy-ca \
     && rm -f main.zip
 
-RUN cd /opt/rust-toy-ca \
+# Build the project
+RUN cd rust-toy-ca \
     && cargo build --release \
     && cp -a target/release/rust-toy-ca /usr/bin/ \
     && cargo clean
 
+# Expose the port
 EXPOSE 8888
+
