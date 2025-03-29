@@ -1,4 +1,4 @@
-# Example:
+# Example:                                                                                                                                                                               
 # 
 # $ sudo docker build --tag "supermasita/rust-toy-ca" .
 # $ sudo docker run -v /home/user/certs/:/certs/ -p 8888:8888 --rm supermasita/rust-toy-ca /usr/bin/rust-toy-ca --ca-cert-file /certs/ca.crt --ca-pkey-file /certs/ca.key --listen 0.0.0.0:8888 
@@ -9,7 +9,7 @@ ENV UPDATED "2025-03-29"
 
 # Install dependencies
 RUN apt-get update \
-    && apt-get install -y curl unzip openssl libssl-dev pkg-config \
+    && apt-get install -y curl unzip openssl libssl-dev pkg-config build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust using rustup
@@ -30,7 +30,7 @@ RUN curl -L https://codeload.github.com/supermasita/rust-toy-ca/zip/main -o main
 # Build the project
 RUN cd rust-toy-ca \
     && cargo build --release \
-    && cp -a target/release/rust-toy-ca /usr/bin/ \
+    && cp -a target/release/rust-toy-ca /usr/bin/ \ 
     && cargo clean
 
 # Expose the port
